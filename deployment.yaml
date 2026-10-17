@@ -35,7 +35,6 @@ spec:
           readinessProbe:
             httpGet:
              path: /status
-             
              port: 8000
             initialDelaySeconds: 5
             periodSeconds: 5
