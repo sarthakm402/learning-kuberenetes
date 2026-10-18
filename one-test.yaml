@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: oom-test
+spec:
+  restartPolicy: Always
+  containers:
+    - name: oom-test
+      image: chaos-api:v1
+      imagePullPolicy: IfNotPresent
+      command:
+        - python
+        - -c
+        - |
+          import time
+          x = bytearray(150 * 1024 * 1024)
+          for i in range(0, len(x), 4096):
+              x[i] = 1
+          time.sleep(300)
+      resources:
+        requests:
+          memory: "32Mi"
+          cpu: "100m"
+        limits:
+          memory: "64Mi"
+          cpu: "500m"
