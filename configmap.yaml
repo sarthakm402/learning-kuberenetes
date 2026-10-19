@@ -1,0 +1,6 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chaos-api-config
+data:
+  APP_MESSAGE: "AI systems lab running"

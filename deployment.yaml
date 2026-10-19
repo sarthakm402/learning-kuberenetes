@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: chaos-api
+  name: chaos-api  
 spec:
   replicas: 2
   selector:
@@ -14,8 +14,15 @@ spec:
     spec:
       containers:
         - name: chaos-api
-          image: chaos-api:v1
+          image: chaos-api:v2
           imagePullPolicy: IfNotPresent
+          env:
+            - name: APP_MESSAGE
+              valueFrom:
+                configMapKeyRef:
+                  name: chaos-api-config
+                  key: APP_MESSAGE
+
           ports:
             - containerPort: 8000
           resources:
