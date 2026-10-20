@@ -22,6 +22,11 @@ spec:
                 configMapKeyRef:
                   name: chaos-api-config
                   key: APP_MESSAGE
+            - name: MODEL_API_KEY
+              valueFrom:
+               secretKeyRef:
+                name: chaos-api-secret
+                key: MODEL_API_KEY
 
           ports:
             - containerPort: 8000
