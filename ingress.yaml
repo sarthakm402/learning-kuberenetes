@@ -1,0 +1,18 @@
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: chaos-api-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: chaos-api.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: chaos-api-service
+                port:
+                  number: 8000
