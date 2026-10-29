@@ -11,6 +11,84 @@ LABEL_SELECTOR = "app=chaos-api"
 previous_state = {}
 
 
+def diagnose_restart(pod, container):
+    pod_name = pod.metadata.name
+
+    print("\n" + "=" * 60)
+    print(f"DIAGNOSTICS: {pod_name}")
+    print("=" * 60)
+
+    # 1. Inspect the last terminated container state
+    terminated = container.last_state.terminated
+
+    print("\n[1] Previous container state")
+
+    if terminated:
+        print(f"Reason:    {terminated.reason}")
+        print(f"Exit code: {terminated.exit_code}")
+        print(f"Message:   {terminated.message or 'No message recorded'}")
+        print(f"Finished:  {terminated.finished_at}")
+    else:
+        print("No previous termination details available.")
+
+    # 2. Retrieve logs from the previous container instance
+    print("\n[2] Previous container logs")
+
+    try:
+        logs = core.read_namespaced_pod_log(
+            name=pod_name,
+            namespace=NAMESPACE,
+            container=container.name,
+            previous=True,
+            tail_lines=50,
+        )
+
+        if logs.strip():
+            print(logs)
+        else:
+            print("Previous container produced no available logs.")
+
+    except ApiException as exc:
+        print(f"Could not retrieve previous logs: {exc.reason}")
+
+    # 3. Retrieve events associated with this Pod
+    print("\n[3] Pod events")
+
+    try:
+        result = core.list_namespaced_event(
+            namespace=NAMESPACE,
+            field_selector=f"involvedObject.name={pod_name}",
+            limit=50,
+        )
+
+        events = sorted(
+            result.items,
+            key=lambda event: (
+                event.last_timestamp
+                or event.event_time
+                or event.metadata.creation_timestamp
+            ),
+            reverse=True,
+        )
+
+        if not events:
+            print("No matching events found.")
+        else:
+            for event in events[:10]:
+                print(
+                    f"Type: {event.type} | "
+                    f"Reason: {event.reason} | "
+                    f"Count: {event.count}"
+                )
+                print(f"Message: {event.message}")
+                print("-" * 40)
+
+    except ApiException as exc:
+        print(f"Could not retrieve Pod events: {exc.reason}")
+
+    print("=" * 60 + "\n")
+
+
 def inspect_pod(pod):
     pod_name = pod.metadata.name
     phase = pod.status.phase
@@ -37,6 +115,10 @@ def inspect_pod(pod):
                 f"restarts={current['restart_count']}"
             )
 
+            # Investigate an existing restart when monitoring starts.
+            if current["restart_count"] > 0:
+                diagnose_restart(pod, container)
+
         else:
             if current["restart_count"] > previous["restart_count"]:
                 print(
@@ -45,11 +127,17 @@ def inspect_pod(pod):
                     f"{current['restart_count']})"
                 )
 
+                diagnose_restart(pod, container)
+
             if previous["ready"] and not current["ready"]:
-                print(f"ALERT: Container {container.name} became unready")
+                print(
+                    f"ALERT: Container {container.name} became unready"
+                )
 
             if not previous["ready"] and current["ready"]:
-                print(f"RECOVERY: Container {container.name} is ready again")
+                print(
+                    f"RECOVERY: Container {container.name} is ready again"
+                )
 
         previous_state[key] = current
 
@@ -58,6 +146,7 @@ def observe():
     watcher = watch.Watch()
 
     print("Monitoring chaos-api Pods...")
+    print("Automatic diagnostics enabled.")
     print("Press Ctrl+C to stop.")
 
     try:
