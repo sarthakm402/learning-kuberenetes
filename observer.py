@@ -4,12 +4,33 @@ from kubernetes.client.exceptions import ApiException
 config.load_kube_config()
 
 core = client.CoreV1Api()
-
+app= client.AppsV1Api()
 NAMESPACE = "default"
 LABEL_SELECTOR = "app=chaos-api"
-
+previous_deployment_health = None
 previous_state = {}
+def interpret_termination(terminated):
+    reason = terminated.reason
+    exit_code = terminated.exit_code
 
+    print("\n[INTERPRETATION]")
+
+    if reason == "OOMKilled":
+        print("Container was killed because it exceeded its memory limit.")
+
+    elif reason == "Error" and exit_code == 1:
+        print("Application exited with an error.")
+        print("Check previous container logs for the underlying cause.")
+
+    elif reason == "Unknown" or exit_code == 255:
+        print("Kubernetes could not determine the exact termination cause.")
+        print("Investigate node and container runtime events.")
+
+    elif reason == "Completed":
+        print("Container exited successfully.")
+
+    else:
+        print(f"Unrecognized termination: reason={reason}, exit_code={exit_code}")
 
 def diagnose_restart(pod, container):
     pod_name = pod.metadata.name
@@ -28,6 +49,7 @@ def diagnose_restart(pod, container):
         print(f"Exit code: {terminated.exit_code}")
         print(f"Message:   {terminated.message or 'No message recorded'}")
         print(f"Finished:  {terminated.finished_at}")
+        interpret_termination(terminated)
     else:
         print("No previous termination details available.")
 
@@ -42,7 +64,8 @@ def diagnose_restart(pod, container):
             previous=True,
             tail_lines=50,
         )
-
+        if isinstance(logs, bytes):
+           logs = logs.decode("utf-8", errors="replace")
         if logs.strip():
             print(logs)
         else:
@@ -140,8 +163,35 @@ def inspect_pod(pod):
                 )
 
         previous_state[key] = current
+def check_deployment_health():
+    global previous_deployment_health
 
+    deployment = app.read_namespaced_deployment(
+        name="chaos-api",
+        namespace=NAMESPACE
+    )
 
+    desired = deployment.spec.replicas or 0
+    ready = deployment.status.ready_replicas or 0
+
+    healthy = ready >= desired
+
+    if previous_deployment_health is None:
+        print(
+            f"\nInitial Deployment health: "
+            f"{'HEALTHY' if healthy else 'DEGRADED'}"
+        )
+
+    elif previous_deployment_health and not healthy:
+        print("\n[ALERT] Deployment became degraded!")
+
+    elif not previous_deployment_health and healthy:
+        print("\n[RECOVERY] Deployment is healthy again!")
+
+    if not healthy:
+        print(f"Desired: {desired} | Ready: {ready}")
+
+    previous_deployment_health = healthy
 def observe():
     watcher = watch.Watch()
 
@@ -173,6 +223,7 @@ def observe():
                 continue
 
             inspect_pod(pod)
+            check_deployment_health()
 
     except ApiException as exc:
         print(f"Kubernetes API error: {exc}")
