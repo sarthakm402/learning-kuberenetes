@@ -7,6 +7,7 @@ core = client.CoreV1Api()
 app= client.AppsV1Api()
 NAMESPACE = "default"
 LABEL_SELECTOR = "app=chaos-api"
+# LABEL_SELECTOR = ""
 previous_deployment_health = None
 previous_state = {}
 def interpret_termination(terminated):
@@ -118,6 +119,18 @@ def inspect_pod(pod):
 
     print(f"\nPod: {pod_name}")
     print(f"Phase: {phase}")
+    for container in pod.status.container_statuses or []:
+     state = container.state
+
+     if state.waiting:
+        print(f"Container waiting: {state.waiting.reason}")
+        print(f"Message: {state.waiting.message}")
+
+     elif state.running:
+        print(f"Container running since: {state.running.started_at}")
+
+     elif state.terminated:
+        print(f"Container terminated: {state.terminated.reason}")
 
     if phase == "Failed":
         print("ALERT: Pod has failed")
