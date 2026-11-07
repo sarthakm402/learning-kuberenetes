@@ -6,7 +6,7 @@ import socket
 
 app = FastAPI()
 
-APP_MESSAGE = os.getenv("APP_MESSAGE", "chaos lab running")
+APP_MESSAGE = os.getenv("APP_MESSAGE", "chaos lab running") 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 MODEL_NAME = os.getenv("MODEL_NAME", "qwen3.5:2b")
 
