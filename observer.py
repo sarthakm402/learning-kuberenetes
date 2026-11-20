@@ -12,7 +12,7 @@ previous_deployment_health = None
 previous_state = {}
 def interpret_termination(terminated):
     reason = terminated.reason
-    exit_code = terminated.exit_code
+    exit_code = terminated.exit_code 
 
     print("\n[INTERPRETATION]")
 
