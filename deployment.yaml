@@ -12,7 +12,7 @@ spec:
       labels:
         app: chaos-api
     spec:
-      containers:
+      containers: 
         - name: chaos-api
           image: chaos-api:v2
           imagePullPolicy: IfNotPresent
